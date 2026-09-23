@@ -10,7 +10,9 @@ from lark_oapi.api.im.v1 import GetChatMembersRequest, GetChatRequest
 
 USER_ID = re.compile(r"(?<![A-Za-z0-9_])ou_[A-Za-z0-9_-]+(?![A-Za-z0-9_])")
 STREAM_USER_ID = re.compile(r"(?<![A-Za-z0-9_])ou_[A-Za-z0-9_-]*(?![A-Za-z0-9_])")
-PROTECTED = re.compile(r"(<[^>]+>|https?://[^\s<>]+)")
+PROTECTED = re.compile(
+    r"(<[^>]+>|https?://[^\s<>]+|[^:\s<>]+:(?:GroupMessage|FriendMessage|OtherMessage):[^\s<>`]+)"
+)
 
 
 class TTLCache:

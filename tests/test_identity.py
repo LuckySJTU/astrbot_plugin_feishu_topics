@@ -92,3 +92,19 @@ async def test_sdk_view_does_not_mutate_shared_request_or_mention_ids(harness):
     parsed = json.loads(sent.body.content)["zh_cn"]["content"][0]
     assert parsed[0]["user_id"] == "ou_alice"
     assert parsed[1]["text"] == '小王 <at user_id="ou_alice">小王</at> https://example.com/ou_alice'
+
+
+async def test_canonical_session_addresses_are_not_display_names(harness):
+    directory = Directory(harness.client, logging.getLogger("test"))
+    directory.remember("ou_alice", "小王")
+    origin = "feishu:GroupMessage:ou_alice%oc_group~ft~om_root"
+    assert directory.display(f"ou_alice 的目标：{origin}") == f"小王 的目标：{origin}"
+
+
+async def test_sid_diagnostics_keep_real_ids(harness, receive):
+    from astrbot.api.event import MessageChain
+
+    event = await receive(harness, "/sid")
+    event.message_str = "sid"
+    await event.send(MessageChain().message("User ID: ou_alice"))
+    assert "ou_alice" in harness.client.im.v1.message.areply.call_args.args[0].body.content

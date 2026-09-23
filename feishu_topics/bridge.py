@@ -80,7 +80,7 @@ class Bridge:
             if not self.active or not data:
                 return event
             event.set_extra(EXTRA, data)
-            event.bot = self._client(adapter, scope, directory, abm.group_id, data["topic"])
+            event.bot = self._client(adapter, scope, directory, abm.group_id, data["topic"], event)
             return event
 
         async def send(session, chain):
@@ -106,7 +106,7 @@ class Bridge:
         self._patch(adapter, "send_by_session", send)
         self.logger.info("[FeishuTopics] 已接入飞书适配器 %s", adapter.meta().id)
 
-    def _client(self, adapter, scope, directory, chat, topic):
+    def _client(self, adapter, scope, directory, chat, topic, event=None):
         async def sent(message_id, text, update):
             if not chat or not self.active:
                 return
@@ -133,7 +133,12 @@ class Bridge:
             adapter.lark_api,
             directory,
             in_thread=topic is not None,
-            sanitize=self.config.get("sanitize_output", True),
+            # /sid is explicitly a protocol diagnostic used to configure administrators.
+            # WakingCheck removes the configured prefix before that handler runs.
+            sanitize=lambda: (
+                self.config.get("sanitize_output", True)
+                and not (event and event.message_str.strip() in {"sid", "/sid"})
+            ),
             on_sent=sent,
         )
 

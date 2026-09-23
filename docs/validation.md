@@ -4,8 +4,8 @@
 
 | 环境 | 检查 | 结果 |
 | --- | --- | --- |
-| macOS / Python 3.13.11 / AstrBot 4.28.1 / lark-oapi 1.7.3 | `pytest -q` | 30 passed |
-| macOS / Python 3.13.11 / AstrBot 4.28.1 / lark-oapi 1.4.15 | `pytest -q` | 30 passed |
+| macOS / Python 3.13.11 / AstrBot 4.28.1 / lark-oapi 1.7.3 | `pytest -q` | 32 passed |
+| macOS / Python 3.13.11 / AstrBot 4.28.1 / lark-oapi 1.4.15 | `pytest -q` | 32 passed |
 | Ruff | 静态检查与格式检查 | 通过 |
 | 配置 | JSON 语法 | 通过 |
 

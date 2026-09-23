@@ -48,13 +48,16 @@ def clone_request(request):
 
 
 def client_view(client, directory, *, in_thread=False, sanitize=True, on_sent=None):
+    def should_sanitize():
+        return sanitize() if callable(sanitize) else sanitize
+
     async def send(method, request, *args, **kwargs):
         request = clone_request(request)
         body = request.request_body
         if in_thread:
             body.reply_in_thread = True
         payload = json.loads(body.content)
-        if sanitize:
+        if should_sanitize():
             payload = display_content(payload, directory.display)
             body.content = json.dumps(payload, ensure_ascii=False)
         response = await method(request, *args, **kwargs)
@@ -85,7 +88,7 @@ def client_view(client, directory, *, in_thread=False, sanitize=True, on_sent=No
 
         async def content(request, *args, **kwargs):
             request = clone_request(request)
-            if sanitize:
+            if should_sanitize():
                 request.request_body.content = directory.display(
                     request.request_body.content, streaming=True
                 )
