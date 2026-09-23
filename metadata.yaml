@@ -1,0 +1,9 @@
+name: astrbot_plugin_feishu_topics
+display_name: 飞书姓名与话题增强
+desc: 真实姓名解析、话题独立会话与同群上下文、指定话题主动发送。
+version: v0.1.0
+author: LuckySJTU
+repo: https://github.com/LuckySJTU/astrbot_plugin_feishu_topics
+support_platforms:
+  - lark
+astrbot_version: ">=4.28.1,<4.29"

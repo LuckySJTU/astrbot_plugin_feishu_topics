@@ -1,0 +1,3 @@
+# Already provided by AstrBot 4.28.1. No additional credentials or service needed.
+aiosqlite>=0.21.0
+lark-oapi>=1.4.15

@@ -1,0 +1,13 @@
+{
+  "platform_ids": {"description": "启用的飞书适配器 ID", "type": "list", "default": [], "hint": "留空启用所有已配置的官方 lark 适配器。"},
+  "topic_chat_ids": {"description": "手动指定的话题群 chat_id", "type": "list", "default": [], "hint": "通常自动识别。缺少群信息权限且根消息没有 thread_id 时可填 oc_...。不要填写普通群。"},
+  "share_group_context": {"description": "向模型提供同群近期上下文", "type": "bool", "default": true},
+  "group_context_messages": {"description": "每次请求最多附带的群消息条数", "type": "int", "default": 40, "hint": "0–200；仅机器人实际收到的消息，包含各话题来源。"},
+  "group_context_chars": {"description": "群上下文字符上限", "type": "int", "default": 12000, "hint": "1000–50000，超出时去掉最旧的记录。"},
+  "history_limit": {"description": "每群最多保存的近期消息条数", "type": "int", "default": 500, "hint": "20–10000；路由和别名单独持久化。"},
+  "retention_days": {"description": "群消息保留天数", "type": "int", "default": 7, "hint": "1–365；启动及收到消息时清理过期记录，读取时同样过滤。"},
+  "sanitize_output": {"description": "将回复正文中的用户 ID 转为姓名", "type": "bool", "default": true, "hint": "未知姓名显示‘未知成员’；不改真实 @ 的标识符、链接或协议字段。"},
+  "member_name_fallback": {"description": "通讯录查询失败时尝试群成员姓名", "type": "bool", "default": true},
+  "name_cache_ttl": {"description": "姓名与群信息缓存秒数", "type": "int", "default": 3600, "hint": "60–86400。失败缓存 60 秒。"},
+  "lookup_timeout": {"description": "单次查询超时秒数", "type": "int", "default": 3, "hint": "1–15。"}
+}

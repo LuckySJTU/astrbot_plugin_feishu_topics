@@ -1,0 +1,1 @@
+"""AstrBot Feishu Topics plugin."""
