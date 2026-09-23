@@ -2,21 +2,27 @@
 
 为 **AstrBot v4.28.1 的内置 `lark` 飞书适配器**补充真实姓名、话题会话、同群上下文和指定话题主动发送。继续使用原来的机器人配置、连接和凭证。
 
-**v0.1.0 是供实群测试的首版。** 已用真实 AstrBot 和飞书 Python SDK 跑离线集成测试，飞书 HTTP 返回使用模拟数据；尚未在真实租户验收。
+**当前正式版：v0.1.0。** 话题识别、同群上下文和流式回复中的姓名显示已获使用者实群验证；另有 32 项自动测试覆盖主要发送与路由路径。完整验证范围见 [验证记录](docs/validation.md)。
 
 ## 安装
 
-本仓库为私有仓库。最方便的方式是下载插件 ZIP，然后在 AstrBot 管理面板的插件页选择**上传安装**，安装后重启 AstrBot。发布包不含测试环境或凭证。
+在 AstrBot 管理面板的插件页选择**从 URL 安装**，填入：
+
+```text
+https://github.com/LuckySJTU/astrbot_plugin_feishu_topics
+```
+
+也可以从 [Releases](https://github.com/LuckySJTU/astrbot_plugin_feishu_topics/releases/latest) 下载插件 ZIP，在插件页选择**上传安装**。安装后重启 AstrBot。发布包不含测试环境、运行数据或凭证。
 
 - 已提供 ZIP 时，直接上传 `astrbot_plugin_feishu_topics-v0.1.0.zip`。
 - 也可以登录 GitHub，在本仓库 `Code → Download ZIP` 下载源码包，再上传安装。
-- 在有 GitHub 仓库访问权限的 AstrBot 主机上，也可在 AstrBot 工作目录执行：
+- 也可在 AstrBot 工作目录执行：
 
 ```bash
 git clone https://github.com/LuckySJTU/astrbot_plugin_feishu_topics.git data/plugins/astrbot_plugin_feishu_topics
 ```
 
-私有仓库通过 Git 的认证方式访问；不要把访问令牌写进插件配置或提交到仓库。未配置仓库认证时，AstrBot 的“从 URL 安装”通常不能直接下载私有仓库。
+本插件复用 AstrBot 已配置的飞书应用，无需再填写 App Secret。版本变化见 [CHANGELOG.md](CHANGELOG.md)。
 
 启动日志应出现 `[FeishuTopics] 已接入飞书适配器 <你的适配器ID>`。插件默认对所有内置 `lark` 实例生效，可以用 `platform_ids` 限定。
 
@@ -49,6 +55,8 @@ git clone https://github.com/LuckySJTU/astrbot_plugin_feishu_topics.git data/plu
 5. 在 A 中通过 AstrBot 原生定时任务设定“一分钟后在当前话题提醒我检查结果”。确认定时任务的会话目标包含 `~ft~`。到时应回到 A，重启后仍有效。
 
 **流式回复测试：** 开启流式输出，在两个话题同时 @ 机器人要求长回复。两张卡片应各自留在原话题。模型输出中的 `ou_...` 会在每次累计文本更新时转为姓名；ID 尚未拼完整时暂显示“未知成员”，后续更新为已知姓名。结构化 `@` 的底层用户 ID、链接和会话地址保持原值。原生 `/sid` 是专用诊断命令，也保留真实 ID，方便设置管理员。
+
+测试称呼时可以使用：“给我一个长回复，中间用我的姓名称呼我一次，不需要 @ 提醒。”姓名转换只修改正文，不额外发送消息。如果要求真正 @，模型可能通过 AstrBot 的 `send_message_to_user` 工具发送普通消息，再生成流式确认；这属于工具调用行为。本版本不新增流式卡片内的 @ 提醒适配。
 
 飞书根消息缺少 `thread_id` 且应用无法查询群信息时，可将该话题群 `oc_...` 填入插件配置 `topic_chat_ids`，再重试。普通群不要填入该项。
 
@@ -94,7 +102,7 @@ await self.context.send_message(target, MessageChain().message("日报已生成"
 - 群上下文作为临时输入发送给已配置的模型，不反复复制到每条 AstrBot 会话历史。不同群、不同机器人实例/App ID 分开存储。不开启 `share_group_context` 时，只提供当前会话位置。
 - 本插件数据在 `data/plugin_data/astrbot_plugin_feishu_topics/topics.sqlite3`。备份时保留整个插件数据目录。姓名缓存有有效期，失败缓存 60 秒。
 - 卸载或禁用会恢复本插件覆盖的适配器入口，不修改 AstrBot 源文件。升级 AstrBot 后应重新跑测试；目前声明兼容 `>=4.28.1,<4.29`，实测基线为 4.28.1。
-- 首版主要验证内置 Agent。Dify、Coze 等外部 Agent 对临时上下文的使用方式未验证；文件上传、音视频实群投递仍使用上游能力，需要现场验收。
+- 当前版本主要验证内置 Agent。Dify、Coze 等外部 Agent 对临时上下文的使用方式未验证；文件上传、音视频实群投递仍使用上游能力，需要现场验收。
 
 ## 开发与验证
 

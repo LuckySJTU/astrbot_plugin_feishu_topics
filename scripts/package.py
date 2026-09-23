@@ -18,6 +18,7 @@ files = [
         "_conf_schema.json",
         "requirements.txt",
         "README.md",
+        "CHANGELOG.md",
     )
 ]
 files.extend(sorted((ROOT / "feishu_topics").glob("*.py")))

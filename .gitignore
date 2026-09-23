@@ -10,3 +10,11 @@ data/
 .env*
 dist/
 .DS_Store
+*.log
+*.bundle
+*.pem
+*.key
+*.p12
+*.pfx
+credentials*.json
+secrets*.json
