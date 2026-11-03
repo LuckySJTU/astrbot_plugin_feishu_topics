@@ -9,7 +9,7 @@
 | 4.28.1 仅为私聊查姓名；4.29.4 也为群聊查询并缓存发送者姓名 | 优先记住上游已获取的真实姓名，缺失时补充；仍保留正文 ID 转姓名、提及和引用姓名补全，不更改协议用户 ID |
 | `raw_message` 保留 SDK 消息的 `thread_id`、`root_id`、`parent_id` | 使用这些字段识别话题；根消息无 `thread_id` 时用 `chat_mode=topic` 或显式配置 |
 | 群 `session_id` 原本是 `chat_id` | 在事件入队前改成 `chat_id~ft~root_message_id`，保留真实 `group_id` |
-| `unique_session=True` 在 4.28 的唤醒阶段、4.29 的事件总线中重建会话 ID | 定位当前宿主实际使用的构建表，仅包装 `lark` 一项；在管道注册前保留话题后缀，卸载时恢复 |
+| `unique_session=True` 在 4.28.1 / 4.29.0 的唤醒阶段、4.29.4 的事件总线中重建会话 ID | 定位当前宿主实际使用的构建表，仅包装 `lark` 一项；在会话路由前保留话题后缀，卸载时恢复 |
 | 4.29 的 `handle_msg()` 新增 `quoted_post_id` 关键字参数 | 包装转发原始参数，保留上游引用格式元数据，不剥离富文本空白 |
 | 回复入口 `_send_im_message()` 写死 `reply_in_thread=False` | 为每个事件的 `bot` 提供 SDK 代理视图，复制请求并设置 True；不修改共享客户端或 SDK 全局类 |
 | `send_streaming()` 创建 CardKit 卡片，再通过相同的 IM reply 入口投递 | 初次卡片投递同样设置话题内回复；后续 `card_element.acontent()` 按累计文本替换显示姓名 |

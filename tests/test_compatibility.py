@@ -1,6 +1,7 @@
 """Regression coverage for interfaces changed by AstrBot 4.29."""
 
 import asyncio
+import inspect
 import json
 from types import SimpleNamespace as NS
 from unittest.mock import AsyncMock
@@ -13,12 +14,11 @@ from astrbot.core.platform.sources.lark.lark_adapter import LarkPlatformAdapter
 from conftest import response
 from lark_oapi.api.im.v1 import GetMessageResponseBody
 
-pytestmark = pytest.mark.skipif(
+
+@pytest.mark.skipif(
     not hasattr(EventBus, "_apply_session_isolation"),
     reason="This regression targets the AstrBot 4.29 event bus.",
 )
-
-
 async def test_event_bus_preserves_topic_before_pipeline_dispatch(harness, receive):
     a = await receive(harness, mid="om_a", thread="omt_a")
     b = await receive(harness, mid="om_b", thread="omt_b")
@@ -53,6 +53,10 @@ async def test_event_bus_preserves_topic_before_pipeline_dispatch(harness, recei
     assert not b.get_extra("_session_isolated")
 
 
+@pytest.mark.skipif(
+    "quoted_post_id" not in inspect.signature(LarkPlatformAdapter.handle_msg).parameters,
+    reason="Quoted post metadata requires AstrBot 4.29.",
+)
 async def test_post_and_quote_metadata_survive_adapter_wrapper(harness, receive):
     content = {
         "title": "笔记",
@@ -94,6 +98,10 @@ async def test_post_and_quote_metadata_survive_adapter_wrapper(harness, receive)
     assert quote.message_str == "笔记\n    第一行 小王\n\n第二行  "
 
 
+@pytest.mark.skipif(
+    "quoted_post_id" not in inspect.signature(LarkPlatformAdapter.handle_msg).parameters,
+    reason="Quoted post metadata requires AstrBot 4.29.",
+)
 async def test_inactive_wrapper_forwards_new_keyword(harness, receive):
     event = await receive(harness)
     harness.plugin.bridge.active = False
