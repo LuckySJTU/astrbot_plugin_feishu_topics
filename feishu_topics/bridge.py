@@ -13,12 +13,11 @@ from astrbot.core.platform.sources.lark.lark_event import LarkMessageEvent
 from lark_oapi.api.im.v1 import GetMessageRequest
 
 from .client import client_view
-from .compat import unique_session_builders
+from .compat import bridge_owner, unique_session_builders
 from .identity import Directory
 from .routing import Topic, get_field, parse_topic
 
 EXTRA = "feishu_topics"
-MISSING = object()
 
 
 class Bridge:
@@ -31,8 +30,15 @@ class Bridge:
         self.patches = []
         self.unique_patch = None
         self.active = True
+        self._missing = object()
 
     def install(self):
+        if not self.active:
+            return
+        # Resolve the host hook before changing any adapter. Older releases could
+        # fail here after patching handle_msg, leaving an incompatible wrapper.
+        registry = unique_session_builders()
+        self._retire_previous(registry)
         allowed = self.config.get("platform_ids", [])
         for adapter in self.context.platform_manager.platform_insts:
             if adapter.meta().name != "lark" or (allowed and adapter.meta().id not in allowed):
@@ -40,7 +46,6 @@ class Bridge:
             if id(adapter) not in self.adapters:
                 self._install_adapter(adapter)
         if self.unique_patch is None:
-            registry = unique_session_builders()
             original = registry["lark"]
 
             def topic_unique_session(event):
@@ -49,11 +54,40 @@ class Bridge:
                     return f"{event.get_sender_id()}%{data['topic'].session_id}"
                 return original(event)
 
+            topic_unique_session.__feishu_topics_owner__ = self
             registry["lark"] = topic_unique_session
             self.unique_patch = (registry, original, topic_unique_session)
 
+    def _retire_previous(self, registry):
+        retired = set()
+        while True:
+            callbacks = [registry["lark"]]
+            for adapter in self.context.platform_manager.platform_insts:
+                if adapter.meta().name == "lark":
+                    callbacks.extend(
+                        getattr(adapter, attr)
+                        for attr in ("handle_msg", "create_event", "send_by_session")
+                    )
+            previous = next(
+                (
+                    owner
+                    for callback in callbacks
+                    if (owner := bridge_owner(callback)) is not None
+                    and owner is not self
+                    and id(owner) not in retired
+                ),
+                None,
+            )
+            if previous is None:
+                return
+            retired.add(id(previous))
+            previous.uninstall()
+            self.logger.info("[FeishuTopics] 已清理旧实例的适配器包装。")
+            # Uninstall can expose another legacy layer; inspect again.
+
     def _patch(self, obj, attr, value):
-        previous = obj.__dict__.get(attr, MISSING)
+        previous = obj.__dict__.get(attr, self._missing)
+        value.__feishu_topics_owner__ = self
         setattr(obj, attr, value)
         self.patches.append((obj, attr, previous, value))
 
@@ -263,7 +297,7 @@ class Bridge:
         self.active = False
         for obj, attr, previous, installed in reversed(self.patches):
             if getattr(obj, attr) is installed:
-                if previous is MISSING:
+                if previous is self._missing:
                     delattr(obj, attr)
                 else:
                     setattr(obj, attr, previous)
@@ -275,3 +309,4 @@ class Bridge:
                 registry["lark"] = original
         self.patches.clear()
         self.adapters.clear()
+        self.unique_patch = None

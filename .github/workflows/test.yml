@@ -9,17 +9,22 @@ concurrency:
   cancel-in-progress: true
 jobs:
   test:
-    name: AstrBot ${{ matrix.astrbot }} / Python ${{ matrix.python }}
-    runs-on: ubuntu-latest
+    name: AstrBot ${{ matrix.astrbot }} / Python ${{ matrix.python }} / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
         astrbot: ['4.28.1', '4.29.0', '4.29.4']
         python: ['3.12']
+        os: ['ubuntu-latest']
         include:
           - astrbot: '4.29.4'
             python: '3.13'
+            os: ubuntu-latest
+          - astrbot: '4.29.4'
+            python: '3.12'
+            os: windows-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5

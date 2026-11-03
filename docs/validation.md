@@ -1,5 +1,19 @@
 # 验证记录
 
+## v0.1.2 — 2026-11-04
+
+| 环境 | 检查 | 结果 |
+| --- | --- | --- |
+| macOS / Python 3.13.11 / AstrBot 4.29.4 / lark-oapi 1.7.5 | `pytest -q` | 46 passed |
+| macOS / Python 3.13.11 / AstrBot 4.28.1 / lark-oapi 1.7.5 | `pytest -q` | 40 passed, 6 skipped |
+| Ruff | 静态检查与格式检查 | 通过 |
+
+使用者在 v0.1.1 报告收到消息时 `quoted_post_id` 参数报错，并确认完整重启 AstrBot 后恢复正常。本地以已发布的 v0.1.0 代码在 AstrBot 4.29.4 上复现：旧版先包装适配器，随后查找已迁移的会话构建表失败；新版继续包装残留入口时出现相同 TypeError。这是已复现的成因路径，不表示已取得使用者此前加载失败的完整日志。
+
+新增 7 项测试覆盖单层旧包装、多层旧包装、v0.1.0 与 v0.1.1 混合叠加、单独 v0.1.1 残留、重复初始化、其他插件包装与旧实例延迟卸载，以及初始化失败后的回滚和重试。断言引用元数据仍在、消息只准备和发送一次、卸载后恢复原入口及数据库连接关闭。旧版本源码快照只用于测试，不进入发布 ZIP。
+
+CI 保留四组 Linux 版本组合，增加 Windows / Python 3.12 / AstrBot 4.29.4，结果见 [GitHub Actions](https://github.com/LuckySJTU/astrbot_plugin_feishu_topics/actions/workflows/test.yml)。外部飞书网络仍以模拟响应替代，不能替代租户与客户端验收。
+
 ## v0.1.1 — 2026-11-04
 
 | 环境 | 检查 | 结果 |

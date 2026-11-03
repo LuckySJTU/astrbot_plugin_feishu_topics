@@ -2,7 +2,7 @@
 
 为 **AstrBot 4.28.1–4.29.x 的内置 `lark` 飞书适配器**补充真实姓名、话题会话、同群上下文和指定话题主动发送。继续使用原来的机器人配置、连接和凭证。
 
-**当前正式版：v0.1.1。** 适配 AstrBot 4.29.4，并保留 4.28.1 兼容性。已有功能在 4.28.1 上获使用者实群验证；新版通过自动测试核对发送与路由路径，仍需部署者确认实际客户端效果。完整范围见 [验证记录](docs/validation.md)。
+**当前正式版：v0.1.2。** 适配 AstrBot 4.29.4，并保留 4.28.1 兼容性；修复旧版加载失败或热更新后残留包装导致的消息接收报错。已有功能在 4.28.1 上获使用者实群验证；新版通过自动测试核对发送与路由路径，仍需部署者确认实际客户端效果。完整范围见 [验证记录](docs/validation.md)。
 
 ## 安装
 
@@ -14,7 +14,7 @@ https://github.com/LuckySJTU/astrbot_plugin_feishu_topics
 
 也可以从 [Releases](https://github.com/LuckySJTU/astrbot_plugin_feishu_topics/releases/latest) 下载插件 ZIP，在插件页选择**上传安装**。安装后重启 AstrBot。发布包不含测试环境、运行数据或凭证。
 
-- 已提供 ZIP 时，直接上传 `astrbot_plugin_feishu_topics-v0.1.1.zip`。
+- 已提供 ZIP 时，直接上传 `astrbot_plugin_feishu_topics-v0.1.2.zip`。
 - 也可以登录 GitHub，在本仓库 `Code → Download ZIP` 下载源码包，再上传安装。
 - 也可在 AstrBot 工作目录执行：
 
@@ -24,7 +24,9 @@ git clone https://github.com/LuckySJTU/astrbot_plugin_feishu_topics.git data/plu
 
 本插件复用 AstrBot 已配置的飞书应用，无需再填写 App Secret。版本变化见 [CHANGELOG.md](CHANGELOG.md)。
 
-**从 v0.1.0 升级：** 在插件页更新，或上传新版 ZIP 覆盖安装，然后重启 AstrBot。保留 `data/plugin_data/astrbot_plugin_feishu_topics/`，已有上下文、话题别名和带 `~ft~` 的定时目标无需迁移。v0.1.0 的版本上限为 `<4.29`，升级 AstrBot 4.29 后需同步更新本插件。
+**从 v0.1.0 / v0.1.1 升级：** 在插件页更新，或上传新版 ZIP 覆盖安装，然后重启 AstrBot。保留 `data/plugin_data/astrbot_plugin_feishu_topics/`，已有上下文、话题别名和带 `~ft~` 的定时目标无需迁移。v0.1.0 的版本上限为 `<4.29`，升级 AstrBot 4.29 后需同步更新本插件。
+
+如果升级后出现 `Bridge._install_adapter.<locals>.handle() got an unexpected keyword argument 'quoted_post_id'`，说明调用链中仍有旧包装。完整退出并重新启动 AstrBot 可清除内存残留；v0.1.2 会在加载时回收可识别的旧包装，并在自身初始化失败时撤销改动，避免继续叠加。
 
 启动日志应出现 `[FeishuTopics] 已接入飞书适配器 <你的适配器ID>`。插件默认对所有内置 `lark` 实例生效，可以用 `platform_ids` 限定。
 
@@ -121,6 +123,6 @@ pytest -q
 
 默认开发依赖为 AstrBot 4.29.4。测试导入真实的适配器、事件、消息链和飞书 SDK 请求对象，仅模拟网络返回。覆盖姓名权限降级、群成员分页、话题根/回复、多话题并发、普通群与私聊、原生 Cron 事件、流式卡片及回退、跨群拒绝、重载和持久化。4.29 回归还检查事件总线会话隔离、富文本引用参数以及 4.29.4 的按钮卡片投递与回调。
 
-GitHub Actions 运行 AstrBot 4.28.1 / 4.29.0 / 4.29.4 与 Python 3.12 的组合，并额外验证 4.29.4 / Python 3.13。仅适用于较新版本的测试在旧版自动跳过。
+GitHub Actions 在 Linux 运行 AstrBot 4.28.1 / 4.29.0 / 4.29.4 与 Python 3.12 的组合、4.29.4 / Python 3.13，并在 Windows 运行 4.29.4 / Python 3.12。仅适用于较新版本的测试在旧版自动跳过。升级回归使用已发布的 v0.1.0 / v0.1.1 包装代码，覆盖残留旧实例、重复初始化及初始化失败后的清理。
 
 实现依据和扩展点见 [docs/compatibility.md](docs/compatibility.md)。实群测试记录建议包含：AstrBot 版本、是否流式、指令、预期与实际落点、脱敏日志。不要提供 App Secret 或访问令牌。

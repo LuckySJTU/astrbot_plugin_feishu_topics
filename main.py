@@ -22,6 +22,11 @@ class FeishuTopicsPlugin(Star):
         self.bridge = None
 
     async def initialize(self):
+        if self.bridge and self.bridge.active:
+            self.bridge.install()
+            return
+        if self.bridge or self.store:
+            await self.terminate()
         bounds = {
             "history_limit": (500, 20, 10000),
             "retention_days": (7, 1, 365),
@@ -43,9 +48,14 @@ class FeishuTopicsPlugin(Star):
             int(self.config.get("history_limit", 500)),
             int(self.config.get("retention_days", 7)),
         )
-        await self.store.open()
-        self.bridge = Bridge(self.context, self.config, self.store, self.logger)
-        self.bridge.install()
+        try:
+            await self.store.open()
+            self.bridge = Bridge(self.context, self.config, self.store, self.logger)
+            self.bridge.install()
+        except BaseException:
+            # The host may discard a failed plugin without calling terminate().
+            await self.terminate()
+            raise
 
     @filter.on_platform_loaded()
     async def platform_loaded(self):
@@ -58,10 +68,14 @@ class FeishuTopicsPlugin(Star):
             self.bridge.install()
 
     async def terminate(self):
-        if self.bridge:
-            self.bridge.uninstall()
-        if self.store:
-            await self.store.close()
+        try:
+            if self.bridge:
+                self.bridge.uninstall()
+        finally:
+            self.bridge = None
+            if self.store:
+                await self.store.close()
+                self.store = None
 
     @filter.on_llm_request(priority=100)
     async def enrich_request(self, event: AstrMessageEvent, req: ProviderRequest):
