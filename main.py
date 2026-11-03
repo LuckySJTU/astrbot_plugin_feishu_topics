@@ -111,7 +111,7 @@ class FeishuTopicsPlugin(Star):
 
     @filter.on_agent_begin(priority=100)
     async def enrich_scheduled_agent(self, event: AstrMessageEvent, run_context):
-        # 4.28.1's native cron runner bypasses OnLLMRequestEvent, but invokes this hook.
+        # The supported native cron runners bypass OnLLMRequestEvent, but invoke this hook.
         if event.get_platform_name() != "cron" or event.get_extra("feishu_topics_cron_enriched"):
             return
         req = ProviderRequest()

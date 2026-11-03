@@ -4,6 +4,7 @@ import logging
 from types import SimpleNamespace as NS
 
 from conftest import response
+from lark_oapi.api.cardkit.v1 import CreateCardRequest, CreateCardRequestBody
 from lark_oapi.api.im.v1 import ReplyMessageRequest, ReplyMessageRequestBody
 from topic_plugin.feishu_topics.client import client_view
 from topic_plugin.feishu_topics.identity import Directory
@@ -108,3 +109,47 @@ async def test_sid_diagnostics_keep_real_ids(harness, receive):
     event.message_str = "sid"
     await event.send(MessageChain().message("User ID: ou_alice"))
     assert "ou_alice" in harness.client.im.v1.message.areply.call_args.args[0].body.content
+
+
+async def test_card_creation_changes_only_display_text(harness):
+    directory = Directory(harness.client, logging.getLogger("test"))
+    directory.remember("ou_alice", "小王")
+    payload = {
+        "schema": "2.0",
+        "body": {
+            "elements": [
+                {"tag": "markdown", "content": "你好 ou_alice"},
+                {
+                    "tag": "button",
+                    "text": {"tag": "plain_text", "content": "请 ou_alice 确认"},
+                    "behaviors": [
+                        {
+                            "type": "callback",
+                            "value": {"content": "ou_alice", "user_id": "ou_alice"},
+                        }
+                    ],
+                },
+            ]
+        },
+    }
+    request = (
+        CreateCardRequest.builder()
+        .request_body(
+            CreateCardRequestBody.builder().type("card_json").data(json.dumps(payload)).build()
+        )
+        .build()
+    )
+    view = client_view(harness.client, directory)
+    await view.cardkit.v1.card.acreate(request)
+    assert json.loads(request.body.data) == payload
+    sent = harness.client.cardkit.v1.card.acreate.call_args.args[0]
+    assert sent.body is sent.request_body
+    elements = json.loads(sent.body.data)["body"]["elements"]
+    assert elements[0]["content"] == "你好 小王"
+    assert elements[1]["text"]["content"] == "请 小王 确认"
+    assert elements[1]["behaviors"] == payload["body"]["elements"][1]["behaviors"]
+    harness.client.im.v1.message.areply.assert_not_awaited()
+    harness.client.im.v1.message.acreate.assert_not_awaited()
+    unsanitized = client_view(harness.client, directory, sanitize=False)
+    await unsanitized.cardkit.v1.card.acreate(request)
+    assert json.loads(harness.client.cardkit.v1.card.acreate.call_args.args[0].body.data) == payload

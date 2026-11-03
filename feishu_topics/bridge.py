@@ -1,8 +1,11 @@
-"""Small, reversible compatibility bridge for AstrBot 4.28.1's Lark adapter."""
+"""Reversible compatibility bridge for AstrBot 4.28–4.29's Lark adapter."""
 
+import asyncio
 import copy
+import inspect
 import time
 
+from astrbot.api import message_components as Comp
 from astrbot.api.message_components import At, Plain, Reply
 from astrbot.api.platform import MessageType
 from astrbot.core.platform.platform import Platform
@@ -10,6 +13,7 @@ from astrbot.core.platform.sources.lark.lark_event import LarkMessageEvent
 from lark_oapi.api.im.v1 import GetMessageRequest
 
 from .client import client_view
+from .compat import unique_session_builders
 from .identity import Directory
 from .routing import Topic, get_field, parse_topic
 
@@ -36,9 +40,8 @@ class Bridge:
             if id(adapter) not in self.adapters:
                 self._install_adapter(adapter)
         if self.unique_patch is None:
-            from astrbot.core.pipeline.waking_check.stage import UNIQUE_SESSION_ID_BUILDERS
-
-            original = UNIQUE_SESSION_ID_BUILDERS["lark"]
+            registry = unique_session_builders()
+            original = registry["lark"]
 
             def topic_unique_session(event):
                 data = event.get_extra(EXTRA)
@@ -46,8 +49,8 @@ class Bridge:
                     return f"{event.get_sender_id()}%{data['topic'].session_id}"
                 return original(event)
 
-            UNIQUE_SESSION_ID_BUILDERS["lark"] = topic_unique_session
-            self.unique_patch = (UNIQUE_SESSION_ID_BUILDERS, original, topic_unique_session)
+            registry["lark"] = topic_unique_session
+            self.unique_patch = (registry, original, topic_unique_session)
 
     def _patch(self, obj, attr, value):
         previous = obj.__dict__.get(attr, MISSING)
@@ -68,11 +71,11 @@ class Bridge:
         original_create = adapter.create_event
         original_send = adapter.send_by_session
 
-        async def handle(abm):
+        async def handle(abm, *args, **kwargs):
             if not self.active:
-                return await original_handle(abm)
+                return await original_handle(abm, *args, **kwargs)
             await self.prepare(adapter, scope, directory, abm)
-            await original_handle(abm)
+            await original_handle(abm, *args, **kwargs)
 
         def create(abm):
             event = original_create(abm)
@@ -82,6 +85,10 @@ class Bridge:
             event.set_extra(EXTRA, data)
             event.bot = self._client(adapter, scope, directory, abm.group_id, data["topic"], event)
             return event
+
+        accepts_message_type = (
+            "message_type" in inspect.signature(LarkMessageEvent.send_message_chain).parameters
+        )
 
         async def send(session, chain):
             if not self.active:
@@ -98,7 +105,10 @@ class Bridge:
                 raise ValueError("Topic targets must use GroupMessage.")
             await self.store.resolve(scope, topic.chat_id, topic.root_id)
             client = self._client(adapter, scope, directory, topic.chat_id, topic)
-            await LarkMessageEvent.send_message_chain(chain, client, reply_message_id=topic.root_id)
+            options = {"message_type": session.message_type.value} if accepts_message_type else {}
+            await LarkMessageEvent.send_message_chain(
+                chain, client, reply_message_id=topic.root_id, **options
+            )
             await Platform.send_by_session(adapter, session, chain)
 
         self._patch(adapter, "handle_msg", handle)
@@ -144,6 +154,8 @@ class Bridge:
 
     async def prepare(self, adapter, scope, directory, abm):
         raw = abm.raw_message
+        button_type = getattr(Comp, "ButtonInteraction", ())
+        interaction = any(isinstance(part, button_type) for part in abm.message)
         for mention in get_field(raw, "mentions", []) or []:
             directory.remember(
                 get_field(get_field(mention, "id"), "open_id", ""),
@@ -166,25 +178,40 @@ class Bridge:
             mode, name = await directory.chat_info(abm.group_id)
             if name and abm.group:
                 abm.group.group_name = name
-            topic = await self._topic(adapter, scope, abm, mode)
+            topic = await self._topic(adapter, scope, abm, mode, interaction=interaction)
             if topic:
                 await self.store.save_topic(scope, topic, abm.message_str or "[非文本消息]")
                 abm.session_id = topic.session_id
-            await self.store.record(
-                scope=scope,
-                chat=abm.group_id,
-                message_id=abm.message_id,
-                root=topic.root_id if topic else "",
-                sender=abm.sender.user_id,
-                name=abm.sender.nickname,
-                role="user",
-                text=abm.message_str or "[非文本消息]",
-                sent=abm.timestamp,
-            )
+            # A button click reuses the card's message ID; it is not a new chat
+            # message and must not overwrite or masquerade as the card in history.
+            if not interaction:
+                await self.store.record(
+                    scope=scope,
+                    chat=abm.group_id,
+                    message_id=abm.message_id,
+                    root=topic.root_id if topic else "",
+                    sender=abm.sender.user_id,
+                    name=abm.sender.nickname,
+                    role="user",
+                    text=abm.message_str or "[非文本消息]",
+                    sent=abm.timestamp,
+                )
         abm._feishu_topics = {"scope": scope, "chat": abm.group_id, "topic": topic}
 
-    async def _topic(self, adapter, scope, abm, mode):
+    async def _topic(self, adapter, scope, abm, mode, *, interaction=False):
         raw = abm.raw_message
+        if interaction:
+            # Card callbacks carry the source message ID, but no root/thread ID.
+            # Resolve from that message and verify the group before routing.
+            request = GetMessageRequest.builder().message_id(abm.message_id).build()
+            response = await asyncio.wait_for(
+                adapter.lark_api.im.v1.message.aget(request),
+                self.config.get("lookup_timeout", 3),
+            )
+            items = response.data.items if response.success() and response.data else []
+            if not items or items[0].chat_id != abm.group_id:
+                raise ValueError("无法验证按钮来源消息；请检查消息读取权限。")
+            raw = items[0]
         thread = get_field(raw, "thread_id", "") or ""
         if (
             not thread
@@ -199,8 +226,6 @@ class Bridge:
             if known:
                 return known
         if not root and parent:
-            import asyncio
-
             request = GetMessageRequest.builder().message_id(parent).build()
             response = await asyncio.wait_for(
                 adapter.lark_api.im.v1.message.aget(request),

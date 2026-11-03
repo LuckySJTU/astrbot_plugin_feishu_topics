@@ -1,4 +1,4 @@
-"""Real AstrBot 4.28.1 + real SDK models; only the external HTTP boundary is mocked."""
+"""Real AstrBot + real SDK models; only the external HTTP boundary is mocked."""
 
 import importlib
 import importlib.util
@@ -14,6 +14,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 import pytest_asyncio
+from lark_oapi.api.im.v1 import GetChatResponseBody
 
 RUNTIME = tempfile.TemporaryDirectory(prefix="feishu-topics-tests-")
 os.environ["ASTRBOT_ROOT"] = RUNTIME.name
@@ -29,6 +30,21 @@ spec.loader.exec_module(package)
 
 def response(data=None, code=0, msg="OK"):
     return NS(data=data, code=code, msg=msg, success=lambda: code == 0)
+
+
+def chat_response(mode="topic", name="研发群"):
+    return response(GetChatResponseBody({"chat_mode": mode, "name": name}))
+
+
+def build_unique_session_id(event):
+    # Exercise the host's registry independently from the plugin's locator.
+    from astrbot.core.pipeline.waking_check import stage
+
+    if hasattr(stage, "build_unique_session_id"):
+        return stage.build_unique_session_id(event)
+    from astrbot.core.event_bus import UNIQUE_SESSION_ID_BUILDERS
+
+    return UNIQUE_SESSION_ID_BUILDERS[event.get_platform_name()](event)
 
 
 @pytest_asyncio.fixture
@@ -61,7 +77,7 @@ async def harness(tmp_path, monkeypatch):
             )
         )
     )
-    client.im.v1.chat.aget = AsyncMock(return_value=response(NS(chat_mode="topic", name="研发群")))
+    client.im.v1.chat.aget = AsyncMock(return_value=chat_response())
     client.im.v1.chat_members.aget = AsyncMock(
         return_value=response(NS(items=[], has_more=False, page_token=None))
     )
@@ -99,6 +115,8 @@ def receive():
         chat="oc_group",
         sender="ou_alice",
         mentions=None,
+        message_type="text",
+        content=None,
     ):
         import json
 
@@ -117,8 +135,8 @@ def receive():
                         "parent_id": parent,
                         "chat_id": chat,
                         "chat_type": "group" if chat else "p2p",
-                        "message_type": "text",
-                        "content": json.dumps({"text": text}),
+                        "message_type": message_type,
+                        "content": json.dumps(content if content is not None else {"text": text}),
                         "create_time": "1800000000000",
                         "mentions": mentions or [],
                     },

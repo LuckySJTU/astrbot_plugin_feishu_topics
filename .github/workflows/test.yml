@@ -9,15 +9,24 @@ concurrency:
   cancel-in-progress: true
 jobs:
   test:
+    name: AstrBot ${{ matrix.astrbot }} / Python ${{ matrix.python }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        astrbot: ['4.28.1', '4.29.0', '4.29.4']
+        python: ['3.12']
+        include:
+          - astrbot: '4.29.4'
+            python: '3.13'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.12'
+          python-version: ${{ matrix.python }}
           cache: pip
-      - run: python -m pip install -r requirements-dev.txt
+      - run: python -m pip install -r requirements-test.txt 'astrbot==${{ matrix.astrbot }}'
       - run: ruff check .
       - run: ruff format --check .
       - run: pytest -q

@@ -7,9 +7,8 @@ import pytest
 from astrbot.api.event import MessageChain
 from astrbot.api.provider import ProviderRequest
 from astrbot.core.cron.events import CronMessageEvent
-from astrbot.core.pipeline.waking_check.stage import build_unique_session_id
 from astrbot.core.platform.message_session import MessageSession
-from conftest import response
+from conftest import build_unique_session_id, chat_response, response
 from topic_plugin.feishu_topics.routing import Topic, parse_topic
 from topic_plugin.feishu_topics.store import Store
 
@@ -68,7 +67,7 @@ async def test_full_group_context_includes_unwoken_messages_and_is_scoped(harnes
 
 
 async def test_normal_group_and_private_chat_keep_routing(harness, receive):
-    harness.client.im.v1.chat.aget.return_value = response(NS(chat_mode="group", name="普通群"))
+    harness.client.im.v1.chat.aget.return_value = chat_response("group", "普通群")
     event = await receive(harness, thread="", mid="om_regular", root="om_quote")
     assert event.session_id == "oc_group"
     assert build_unique_session_id(event) == "ou_alice%oc_group"
@@ -85,7 +84,7 @@ async def test_normal_group_and_private_chat_keep_routing(harness, receive):
 
 
 async def test_regular_group_thread_is_still_a_topic(harness, receive):
-    harness.client.im.v1.chat.aget.return_value = response(NS(chat_mode="group", name="普通群"))
+    harness.client.im.v1.chat.aget.return_value = chat_response("group", "普通群")
     event = await receive(harness, thread="omt_thread")
     assert event.session_id == "oc_group~ft~om_root"
 

@@ -1,8 +1,8 @@
 # 飞书姓名与话题增强
 
-为 **AstrBot v4.28.1 的内置 `lark` 飞书适配器**补充真实姓名、话题会话、同群上下文和指定话题主动发送。继续使用原来的机器人配置、连接和凭证。
+为 **AstrBot 4.28.1–4.29.x 的内置 `lark` 飞书适配器**补充真实姓名、话题会话、同群上下文和指定话题主动发送。继续使用原来的机器人配置、连接和凭证。
 
-**当前正式版：v0.1.0。** 话题识别、同群上下文和流式回复中的姓名显示已获使用者实群验证；另有 32 项自动测试覆盖主要发送与路由路径。完整验证范围见 [验证记录](docs/validation.md)。
+**当前正式版：v0.1.1。** 适配 AstrBot 4.29.4，并保留 4.28.1 兼容性。已有功能在 4.28.1 上获使用者实群验证；新版通过自动测试核对发送与路由路径，仍需部署者确认实际客户端效果。完整范围见 [验证记录](docs/validation.md)。
 
 ## 安装
 
@@ -14,7 +14,7 @@ https://github.com/LuckySJTU/astrbot_plugin_feishu_topics
 
 也可以从 [Releases](https://github.com/LuckySJTU/astrbot_plugin_feishu_topics/releases/latest) 下载插件 ZIP，在插件页选择**上传安装**。安装后重启 AstrBot。发布包不含测试环境、运行数据或凭证。
 
-- 已提供 ZIP 时，直接上传 `astrbot_plugin_feishu_topics-v0.1.0.zip`。
+- 已提供 ZIP 时，直接上传 `astrbot_plugin_feishu_topics-v0.1.1.zip`。
 - 也可以登录 GitHub，在本仓库 `Code → Download ZIP` 下载源码包，再上传安装。
 - 也可在 AstrBot 工作目录执行：
 
@@ -23,6 +23,8 @@ git clone https://github.com/LuckySJTU/astrbot_plugin_feishu_topics.git data/plu
 ```
 
 本插件复用 AstrBot 已配置的飞书应用，无需再填写 App Secret。版本变化见 [CHANGELOG.md](CHANGELOG.md)。
+
+**从 v0.1.0 升级：** 在插件页更新，或上传新版 ZIP 覆盖安装，然后重启 AstrBot。保留 `data/plugin_data/astrbot_plugin_feishu_topics/`，已有上下文、话题别名和带 `~ft~` 的定时目标无需迁移。v0.1.0 的版本上限为 `<4.29`，升级 AstrBot 4.29 后需同步更新本插件。
 
 启动日志应出现 `[FeishuTopics] 已接入飞书适配器 <你的适配器ID>`。插件默认对所有内置 `lark` 实例生效，可以用 `platform_ids` 限定。
 
@@ -37,7 +39,7 @@ git clone https://github.com/LuckySJTU/astrbot_plugin_feishu_topics.git data/plu
 | 自动识别话题群，包括首条根消息 | `im:chat:read` 或 `im:chat:readonly` 等价权限 |
 | 同群各话题的上下文 | 订阅 `im.message.receive_v1`，开启 `im:message.group_msg`；只收到 @ 消息时，上下文也只有这些消息 |
 | 在指定话题内发消息 | 现有机器人发消息权限，例如 `im:message:send_as_bot` |
-| 查询引用消息或补查根消息 | `im:message:readonly` 或已有 `im:message` 等价权限 |
+| 查询引用消息、补查根消息或恢复按钮来源话题 | `im:message:readonly` 或已有 `im:message` 等价权限 |
 | 流式卡片 | `cardkit:card:write`，并在 AstrBot 开启流式输出 |
 
 姓名查询失败时会显示“未知成员”，不会猜测真实姓名。已收到的 `@` 事件中若带姓名，也会缓存使用。
@@ -101,7 +103,7 @@ await self.context.send_message(target, MessageChain().message("日报已生成"
 - 只包含安装后机器人实际收到的消息以及本插件观察到的已发送回复；不会自动回填安装前历史。图片、文件等非文本消息只保留文本摘要或类型占位，不保存媒体本体。
 - 群上下文作为临时输入发送给已配置的模型，不反复复制到每条 AstrBot 会话历史。不同群、不同机器人实例/App ID 分开存储。不开启 `share_group_context` 时，只提供当前会话位置。
 - 本插件数据在 `data/plugin_data/astrbot_plugin_feishu_topics/topics.sqlite3`。备份时保留整个插件数据目录。姓名缓存有有效期，失败缓存 60 秒。
-- 卸载或禁用会恢复本插件覆盖的适配器入口，不修改 AstrBot 源文件。升级 AstrBot 后应重新跑测试；目前声明兼容 `>=4.28.1,<4.29`，实测基线为 4.28.1。
+- 卸载或禁用会恢复本插件覆盖的适配器入口，不修改 AstrBot 源文件。目前声明兼容 `>=4.28.1,<4.30`；自动验证基线为 4.28.1、4.29.0 和 4.29.4。后续跨版本升级仍需核对适配器接口。
 - 当前版本主要验证内置 Agent。Dify、Coze 等外部 Agent 对临时上下文的使用方式未验证；文件上传、音视频实群投递仍使用上游能力，需要现场验收。
 
 ## 开发与验证
@@ -117,6 +119,8 @@ ruff format --check .
 pytest -q
 ```
 
-测试导入真实的 AstrBot 4.28.1 适配器、事件、消息链和飞书 SDK 请求对象，仅模拟网络返回。覆盖姓名权限降级、群成员分页、话题根/回复、多话题并发、普通群与私聊、原生 Cron 事件、流式卡片及回退、跨群拒绝、重载和持久化。GitHub Actions 会运行同一组检查。
+默认开发依赖为 AstrBot 4.29.4。测试导入真实的适配器、事件、消息链和飞书 SDK 请求对象，仅模拟网络返回。覆盖姓名权限降级、群成员分页、话题根/回复、多话题并发、普通群与私聊、原生 Cron 事件、流式卡片及回退、跨群拒绝、重载和持久化。4.29 回归还检查事件总线会话隔离、富文本引用参数以及 4.29.4 的按钮卡片投递与回调。
+
+GitHub Actions 运行 AstrBot 4.28.1 / 4.29.0 / 4.29.4 与 Python 3.12 的组合，并额外验证 4.29.4 / Python 3.13。仅适用于较新版本的测试在旧版自动跳过。
 
 实现依据和扩展点见 [docs/compatibility.md](docs/compatibility.md)。实群测试记录建议包含：AstrBot 版本、是否流式、指令、预期与实际落点、脱敏日志。不要提供 App Secret 或访问令牌。

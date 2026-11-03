@@ -1,22 +1,27 @@
 # 兼容性与实现依据
 
-核对日期：2026-09-23。基线为 [AstrBot v4.28.1](https://github.com/AstrBotDevs/AstrBot/releases/tag/v4.28.1)，源码提交 `ab42c0d9b726d82ad0f9563e04c53a4460c00d61`。
+核对日期：2026-11-04。新版基线为 [AstrBot v4.29.4](https://github.com/AstrBotDevs/AstrBot/releases/tag/v4.29.4)，源码提交 `61335414433db721b3f7ecc93f90deafe0a59d78`；保留 [v4.28.1](https://github.com/AstrBotDevs/AstrBot/releases/tag/v4.28.1) 的兼容性。
 
 ## 上游行为与插件对应点
 
 | 上游行为 | 本插件做法 |
 | --- | --- |
-| `LarkPlatformAdapter.convert_msg()` 仅为私聊查姓名，群聊昵称为 `open_id[:8]` | 在该实例的 `handle_msg()` 前补充姓名；不更改 `sender.user_id`、真实 @ 标识符和管理员检查 |
+| 4.28.1 仅为私聊查姓名；4.29.4 也为群聊查询并缓存发送者姓名 | 优先记住上游已获取的真实姓名，缺失时补充；仍保留正文 ID 转姓名、提及和引用姓名补全，不更改协议用户 ID |
 | `raw_message` 保留 SDK 消息的 `thread_id`、`root_id`、`parent_id` | 使用这些字段识别话题；根消息无 `thread_id` 时用 `chat_mode=topic` 或显式配置 |
 | 群 `session_id` 原本是 `chat_id` | 在事件入队前改成 `chat_id~ft~root_message_id`，保留真实 `group_id` |
-| `unique_session=True` 会在唤醒阶段重新生成 Lark 会话 ID | 对会话构建表中 `lark` 一项做可恢复的包装，仅对携带本插件话题元数据的事件保留后缀 |
+| `unique_session=True` 在 4.28 的唤醒阶段、4.29 的事件总线中重建会话 ID | 定位当前宿主实际使用的构建表，仅包装 `lark` 一项；在管道注册前保留话题后缀，卸载时恢复 |
+| 4.29 的 `handle_msg()` 新增 `quoted_post_id` 关键字参数 | 包装转发原始参数，保留上游引用格式元数据，不剥离富文本空白 |
 | 回复入口 `_send_im_message()` 写死 `reply_in_thread=False` | 为每个事件的 `bot` 提供 SDK 代理视图，复制请求并设置 True；不修改共享客户端或 SDK 全局类 |
 | `send_streaming()` 创建 CardKit 卡片，再通过相同的 IM reply 入口投递 | 初次卡片投递同样设置话题内回复；后续 `card_element.acontent()` 按累计文本替换显示姓名 |
 | `send_by_session()` 仅理解群/私聊地址 | 仅在存在 `~ft~` 时解析并校验持久化话题，再复用原有消息链转换与附件发送逻辑 |
+| 4.29.4 的 `send_message_chain()` 新增 `message_type`，用于卡片按钮回调 | 检测签名后传入群聊类型；旧版不传入该参数。卡片创建时仅转换显示文字，保留回调值 |
+| 按钮回调有来源卡片 ID，没有普通消息的 `root_id` / `thread_id` | 查询来源消息并校验群归属后复用话题解析；不把点击写成新的聊天记录 |
 | `CronMessageEvent.send()` 调用标准 `context.send_message()` | 定时任务保存原 UMO 后自然经过相同路由；不新增独立调度服务 |
 | 原生 cron 直接 `build_main_agent()`，不经过普通消息的 `on_llm_request` | 另用 `on_agent_begin` 为 cron 添加临时群上下文 |
 
 来源：[Lark 适配器](https://github.com/AstrBotDevs/AstrBot/blob/v4.28.1/astrbot/core/platform/sources/lark/lark_adapter.py)、[Lark 事件与流式卡片](https://github.com/AstrBotDevs/AstrBot/blob/v4.28.1/astrbot/core/platform/sources/lark/lark_event.py)、[唤醒检查](https://github.com/AstrBotDevs/AstrBot/blob/v4.28.1/astrbot/core/pipeline/waking_check/stage.py)、[Cron 事件](https://github.com/AstrBotDevs/AstrBot/blob/v4.28.1/astrbot/core/cron/events.py)、[Cron 管理器](https://github.com/AstrBotDevs/AstrBot/blob/v4.28.1/astrbot/core/cron/manager.py)。
+
+4.29.4 对照来源：[事件总线](https://github.com/AstrBotDevs/AstrBot/blob/v4.29.4/astrbot/core/event_bus.py)、[Lark 适配器](https://github.com/AstrBotDevs/AstrBot/blob/v4.29.4/astrbot/core/platform/sources/lark/lark_adapter.py)、[Lark 消息与卡片](https://github.com/AstrBotDevs/AstrBot/blob/v4.29.4/astrbot/core/platform/sources/lark/lark_event.py)、[Cron 事件](https://github.com/AstrBotDevs/AstrBot/blob/v4.29.4/astrbot/core/cron/events.py)。
 
 纯 `on_llm_request` 钩子不足以改变事件队列的会话身份，也无法覆盖直接调用主动发送的定时任务，因此必须有一层适配器兼容包装。此包装局限在插件启用的 Lark 实例；卸载时检查包装身份，避免覆盖随后由其他插件安装的包装。
 

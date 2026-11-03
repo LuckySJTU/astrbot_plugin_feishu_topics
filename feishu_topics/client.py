@@ -21,6 +21,8 @@ def display_content(value, render):
         return {
             key: render(item)
             if key in {"text", "content", "title"} and isinstance(item, str)
+            else item
+            if key == "value"
             else display_content(item, render)
             for key, item in value.items()
         }
@@ -85,6 +87,16 @@ def client_view(client, directory, *, in_thread=False, sanitize=True, on_sent=No
     overrides = {"im": View(client.im, v1=View(client.im.v1, message=message))}
     if getattr(client, "cardkit", None):
         element = client.cardkit.v1.card_element
+        card = client.cardkit.v1.card
+
+        async def create_card(request, *args, **kwargs):
+            request = clone_request(request)
+            body = request.request_body
+            if should_sanitize() and body.type == "card_json":
+                payload = display_content(json.loads(body.data), directory.display)
+                body.data = json.dumps(payload, ensure_ascii=False)
+            # Creating an entity is not message delivery; do not record it yet.
+            return await card.acreate(request, *args, **kwargs)
 
         async def content(request, *args, **kwargs):
             request = clone_request(request)
@@ -99,6 +111,10 @@ def client_view(client, directory, *, in_thread=False, sanitize=True, on_sent=No
 
         overrides["cardkit"] = View(
             client.cardkit,
-            v1=View(client.cardkit.v1, card_element=View(element, acontent=content)),
+            v1=View(
+                client.cardkit.v1,
+                card=View(card, acreate=create_card),
+                card_element=View(element, acontent=content),
+            ),
         )
     return View(client, **overrides)
